@@ -120,12 +120,4 @@ This project is licensed under the MIT License.
 
 Pull requests and improvements are welcome! Open an issue for feature requests or bug reports.
 
----
-
-Now you can **easily copy and paste** this into your project. 🚀
-## 📜 License
-This project is licensed under the MIT License.
-
-## ✨ Contributions
-Pull requests and improvements are welcome! Open an issue for feature requests or bug reports.
 
