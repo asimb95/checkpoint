@@ -1,0 +1,142 @@
+#!/bin/bash
+
+CHECKPOINT_DIR=".checkpoints"
+
+# Ensure script is running inside a Git repository
+if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+    echo "Error: This script must be run inside a Git repository."
+    exit 1
+fi
+
+# Ensure Git is installed
+if ! command -v git &>/dev/null; then
+    echo "Error: Git is not installed."
+    exit 1
+fi
+
+show_help() {
+    echo "Usage: checkpoint [COMMAND] [OPTIONS]"
+    echo ""
+    echo "Commands:"
+    echo "  commit      Create a checkpoint archive of modified/untracked files"
+    echo "  ls          List all existing checkpoints"
+    echo "  restore     Restore a checkpoint"
+    echo ""
+    echo "Options for 'commit':"
+    echo "  -m MESSAGE  Use the specified message for the checkpoint"
+    echo ""
+    echo "Examples:"
+    echo "  checkpoint commit -m \"Fixed login bug\""
+    echo "  checkpoint commit"
+    echo "  checkpoint ls"
+    echo "  checkpoint restore checkpoint-YYYY-MM-DD_HH-MM-SS.zip"
+}
+
+create_checkpoint() {
+    local message=""
+
+    if [[ "$1" == "-m" && -n "$2" ]]; then
+        message="$2"
+    else
+        read -p "Enter checkpoint message: " message
+    fi
+
+    mkdir -p "$CHECKPOINT_DIR"
+
+    timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+    filename="${CHECKPOINT_DIR}/checkpoint-${timestamp}.zip"
+    meta_file="${CHECKPOINT_DIR}/checkpoint-${timestamp}.json"
+
+    # Get list of modified and untracked files
+    files=$(git diff --name-only HEAD; git ls-files --others --exclude-standard)
+
+    if [[ -z "$files" ]]; then
+        echo "No modified or untracked files to include."
+        exit 0
+    fi
+
+    # Prevent duplicate checkpoints
+    last_meta=$(ls -t ${CHECKPOINT_DIR}/checkpoint-*.json 2>/dev/null | head -n1)
+    if [[ -f "$last_meta" ]] && grep -q "\"files\": \[" "$last_meta"; then
+        last_files=$(jq -r '.files | join(" ")' "$last_meta")
+        current_files=$(echo "$files" | tr '\n' ' ')
+        if [[ "$last_files" == "$current_files" ]]; then
+            echo "No new changes since last checkpoint."
+            exit 0
+        fi
+    fi
+
+    # Create archive
+    echo "$files" | zip -@ "$filename"
+
+    # Save metadata in JSON format
+    jq -n \
+        --arg timestamp "$timestamp" \
+        --arg message "$message" \
+        --arg created_by "$(whoami)" \
+        --arg date "$(date)" \
+        --argjson file_count "$(echo "$files" | wc -l)" \
+        --argjson files "$(jq -R . <<< "$files" | jq -s .)" \
+        '{timestamp: $timestamp, message: $message, created_by: $created_by, date: $date, file_count: $file_count, files: $files}' \
+        > "$meta_file"
+
+    echo "Created checkpoint: $filename"
+    echo "Metadata saved: $meta_file"
+}
+
+list_checkpoints() {
+    if [ ! -d "$CHECKPOINT_DIR" ]; then
+        echo "No checkpoints found."
+        return
+    fi
+
+    count=$(ls "$CHECKPOINT_DIR"/*.json 2>/dev/null | wc -l)
+    if [ "$count" -eq 0 ]; then
+        echo "No checkpoints found."
+        return
+    fi
+
+    printf "%-40s | %-10s | %-50s\n" "Filename" "File Count" "Message"
+    printf "%-40s-|-%-10s-|-%-50s\n" "----------------------------------------" "----------" "--------------------------------------------------"
+
+    for meta_file in $(ls -t "$CHECKPOINT_DIR"/*.json 2>/dev/null); do
+        filename=$(basename "${meta_file%.json}.zip")
+        file_count=$(jq -r '.file_count' "$meta_file")
+        message=$(jq -r '.message' "$meta_file" | head -c 50)
+        printf "%-40s | %-10s | %-50s\n" "$filename" "$file_count" "$message"
+    done
+}
+
+restore_checkpoint() {
+    if [ -z "$1" ]; then
+        echo "Error: No checkpoint file specified."
+        exit 1
+    fi
+
+    local checkpoint_file="${CHECKPOINT_DIR}/$1"
+
+    if [ ! -f "$checkpoint_file" ]; then
+        echo "Error: Checkpoint file '$checkpoint_file' not found."
+        exit 1
+    fi
+
+    unzip -o "$checkpoint_file"
+    echo "Restored files from checkpoint: $1"
+}
+
+case "$1" in
+    "commit")
+        shift
+        create_checkpoint "$@"
+        ;;
+    "ls")
+        list_checkpoints
+        ;;
+    "restore")
+        shift
+        restore_checkpoint "$@"
+        ;;
+    *)
+        show_help
+        ;;
+esac
