@@ -1,4 +1,28 @@
 #!/bin/bash
+#
+# checkpoint - A lightweight script to create and manage local code snapshots
+#
+# This script allows developers to save temporary checkpoints of modified and untracked files
+# in a Git repository without committing them. Useful for saving progress during branch development.
+# 
+# https://github.com/asimb95/checkpoint/
+#
+# Features:
+# - Save modified/untracked files as a zip archive with metadata
+# - List available checkpoints
+# - Restore a previous checkpoint
+#
+# Usage:
+#   checkpoint commit -m "Message"   # Create a checkpoint
+#   checkpoint ls                    # List checkpoints
+#   checkpoint restore <filename>     # Restore a checkpoint
+#
+# Install:
+#   - Place this script in ~/bin or /usr/local/bin and ensure it's in your PATH
+#
+# Author: asimb95
+# License: MIT
+#
 
 CHECKPOINT_DIR=".checkpoints"
 
