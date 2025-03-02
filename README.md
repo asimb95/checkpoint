@@ -11,7 +11,8 @@
 
 1. **Download the script:**
    ```
-   curl -o ~/bin/checkpoint https://raw.githubusercontent.com/asimb95/checkpoint/main/checkpoint
+   curl -o ~/bin/checkpoint https://raw.githubusercontent.com/asimb95/checkpoint/refs/heads/master/checkpoint
+   
    ```
 
 2. **Make it executable:**
